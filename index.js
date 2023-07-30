@@ -101,7 +101,10 @@ export default class TouchGestures {
 		if (!this.squashing) {
 			this.squashing = new Promise(r => setTimeout(r, 16));
 			this.squashing.then(() => {
-				const ongoing = Array.from(this.ongoing.values()).map(i => this.getInteractionInfo(i.start, i.move || i.start));
+				const ongoing = Array.from(this.ongoing.values()).map(i => {
+					const end = i.move || { ...i.start, time: performance.now() };
+					return this.getInteractionInfo(i.start, end);
+				});
 				this.onInteraction(this.squashed, ongoing);
 				this.squashing = null;
 				this.squashed = [];

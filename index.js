@@ -1,11 +1,14 @@
-const MAX_TAP_DURATION = 170;
-const MAX_TAP_MOVEMENT = 2;
-const MIN_SWIPE_MOVEMENT = 50;
-const SWIPE_ANGLE_MARGIN = 45 / 2;
+const DEFAULTS = {
+	maxTapDuration: 170,
+	maxTapMovement: 2,
+	minSwipeMovement: 50,
+	swipeAngleMargin: 45 / 2,
+};
 
 export default class TouchGestures {
-	constructor(cb) {
+	constructor(cb, options = {}) {
 		this.cb = cb;
+		this.options = { ...DEFAULTS, ...options };
 		this.overriding = false;
 		this.caged = false;
 		this.ongoing = new Map();
@@ -36,7 +39,7 @@ export default class TouchGestures {
 		this.cage(setDisabled);
 		window[setDisabled ? 'addEventListener' : 'removeEventListener']('touchmove', this.onTouchMove, { passive: false });
 
-		this.cb && this.cb({ name: setDisabled ? 'native-override' : 'override-restore' });
+		this.cb && this.cb({ name: setDisabled ? 'native-override' : 'override-restore', args: [] });
 	}
 
 	cage(append) {
@@ -69,7 +72,7 @@ export default class TouchGestures {
 				}
 			`;
 
-		this.cb && this.cb({ name: append ? 'cage' : 'uncage' });
+		this.cb && this.cb({ name: append ? 'cage' : 'uncage', args: [] });
 	}
 
 	onTouchStart(e) {
@@ -130,9 +133,9 @@ export default class TouchGestures {
 		const absdx = Math.abs(dx);
 		const absdy = Math.abs(dy);
 
-		if (dt <= MAX_TAP_DURATION && absdx < MAX_TAP_MOVEMENT && absdy < MAX_TAP_MOVEMENT) {
+		if (dt <= this.options.maxTapDuration && absdx < this.options.maxTapMovement && absdy < this.options.maxTapMovement) {
 			type = 'tap';
-		} else if (Math.abs(dx) >= MIN_SWIPE_MOVEMENT || Math.abs(dy) >= MIN_SWIPE_MOVEMENT) {
+		} else if (Math.abs(dx) >= this.options.minSwipeMovement || Math.abs(dy) >= this.options.minSwipeMovement) {
 			type = 'swipe';
 		} else {
 			type = 'hold';
@@ -154,10 +157,12 @@ export default class TouchGestures {
 
 	getSwipeDirection(degrees) {
 		for (let i = 0, l = 9; i < l; i++) {
-			if (Math.abs(45 * i - degrees) <= SWIPE_ANGLE_MARGIN) {
+			if (Math.abs(45 * i - degrees) <= this.options.swipeAngleMargin) {
 				return (45 * i) % 360;
 			}
 		}
+
+		return null;
 	}
 
 	onInteraction(touches, ongoing) {

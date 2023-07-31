@@ -81,7 +81,7 @@ export default class TouchGestures {
 			e.stopPropagation();
 		}
 		const touchStart = this.getTouchInfo(e.changedTouches[0], e);
-		this.ongoing.set(touchStart.identifier, { start: touchStart, move: null });
+		this.ongoing.set(touchStart.identifier, { start: touchStart, update: touchStart });
 	}
 
 	onTouchMove(e) {
@@ -89,7 +89,7 @@ export default class TouchGestures {
 		e.stopPropagation();
 		Array.from(e.changedTouches).forEach(touch => {
 			const touchInfo = this.getTouchInfo(touch, e);
-			this.ongoing.get(touchInfo.identifier).move = touchInfo;
+			this.ongoing.get(touchInfo.identifier).update = touchInfo;
 		});
 	}
 
@@ -102,8 +102,7 @@ export default class TouchGestures {
 			this.squashing = new Promise(r => setTimeout(r, 16));
 			this.squashing.then(() => {
 				const ongoing = Array.from(this.ongoing.values()).map(i => {
-					const end = i.move || { ...i.start, time: performance.now() };
-					return this.getInteractionInfo(i.start, end);
+					return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() });
 				});
 				this.onInteraction(this.squashed, ongoing);
 				this.squashing = null;
@@ -125,7 +124,6 @@ export default class TouchGestures {
 	}
 
 	getInteractionInfo(touchStart, touchEnd) {
-		const time = touchEnd.time;
 		const dt = touchEnd.time - touchStart.time;
 		const dx = touchEnd.screenX - touchStart.screenX;
 		const dy = touchStart.screenY - touchEnd.screenY;
@@ -144,7 +142,7 @@ export default class TouchGestures {
 			type = 'hold';
 		}
 
-		return { time, dt, dx, dy, degrees, direction, type, startEvent: touchStart.e, endEvent: touchEnd.e };
+		return { dt, dx, dy, degrees, direction, type, startEvent: touchStart.e, endEvent: touchEnd.e };
 	}
 
 	getDegrees(dx, dy) {
@@ -173,7 +171,12 @@ export default class TouchGestures {
 			return;
 		}
 
-		if (touches.length === 3 && touches.every(i => i.type === 'tap')) {
+		if (
+			touches.length === 1 &&
+			touches[0].type === 'tap' &&
+			ongoing.length === 3 &&
+			ongoing.every(i => i.type === 'hold')
+		) {
 			this.overrideNativeTouch(!this.overriding);
 		} else if (touches.length === 3 && touches.every(i => i.direction === 270)) {
 			this.cage(false);

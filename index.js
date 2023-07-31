@@ -19,8 +19,8 @@ export default class TouchGestures {
 		this.onTouchMove = this.onTouchMove.bind(this);
 		this.onTouchEnd = this.onTouchEnd.bind(this);
 
-		window.addEventListener('touchstart', this.onTouchStart, { passive: false });
-		window.addEventListener('touchend', this.onTouchEnd, { passive: false });
+		window.addEventListener('touchstart', this.onTouchStart);
+		window.addEventListener('touchend', this.onTouchEnd);
 	}
 
 	overrideNativeTouch(setDisabled = true) {

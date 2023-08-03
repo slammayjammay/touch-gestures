@@ -9,8 +9,7 @@ export default class TouchGestures {
 	constructor(cb, options = {}) {
 		this.cb = cb;
 		this.options = { ...DEFAULTS, ...options };
-		this.overriding = false;
-		this.caged = false;
+		this.caging = false;
 		this.ongoing = new Map();
 		this.squashing = null;
 		this.squashed = [];
@@ -23,31 +22,11 @@ export default class TouchGestures {
 		window.addEventListener('touchend', this.onTouchEnd);
 	}
 
-	overrideNativeTouch(setDisabled = true) {
-		this.overriding = setDisabled;
-
-		const meta = document.querySelector('meta[name=viewport]');
-		if (!setDisabled && meta.hasAttribute('data-previous')) {
-			const previous = meta.getAttribute('data-previous');
-			meta.content = previous;
-			meta.removeAttribute('data-previous');
-		} else {
-			meta.setAttribute('data-previous', meta.content);
-			meta.content = 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no';
-		}
-
-		this.cage(setDisabled);
-		window[setDisabled ? 'addEventListener' : 'removeEventListener']('touchmove', this.onTouchMove, { passive: false });
-
-		this.cb && this.cb({ name: setDisabled ? 'native-override' : 'override-restore', args: [] });
-	}
-
-	cage(append) {
-		this.caged = append;
+	cage(append = true, css = '') {
+		document.querySelector('#--touch-gestures-cage')?.remove();
+		document.querySelector('#--touch-gestures-cage-style')?.remove();
 
 		if (!append) {
-			document.querySelector('#gesture-cage')?.remove();
-			document.querySelector('#gesture-cage-style')?.remove();
 			return;
 		}
 
@@ -55,28 +34,36 @@ export default class TouchGestures {
 		const style = document.createElement('style');
 		document.head.prepend(style);
 		document.body.prepend(el);
-		el.id = 'gesture-cage';
-		style.id = 'gesture-cage-style';
+		el.id = '--touch-gestures-cage';
+		style.id = '--touch-gestures-cage-style';
 		style.innerHTML = `
-				#gesture-cage {
-					z-index: 999999999999999999999999999999999999;
-					position: fixed;
-					top: 0;
-					left: 0;
-					right: 0;
-					bottom: 0;
-					width: 100vw;
-					height: 100vh;
-					background: violet;
-					opacity: 0.3;
-				}
-			`;
+			#${el.id} {
+				z-index: 999999999999999999999999999999999999;
+				position: fixed;
+				--bottom: 80px;
+				--size: 80px;
+				bottom: var(--bottom);
+				left: 0;
+				width: var(--size);
+				height: var(--size);
+				background: violet;
+				opacity: 0.3;
+				${css}
+			}
+		`;
 
+		window.addEventListener('touchmove', this.onTouchMove, { passive: false });
 		this.cb && this.cb({ name: append ? 'cage' : 'uncage', args: [] });
 	}
 
+	getCage() {
+		return document.querySelector('#--touch-gestures-cage');
+	}
+
 	onTouchStart(e) {
-		if (this.caged) {
+		this.caging = this.caging || e.target.id === '--touch-gestures-cage';
+
+		if (this.caging) {
 			e.preventDefault();
 			e.stopPropagation();
 		}
@@ -85,16 +72,18 @@ export default class TouchGestures {
 	}
 
 	onTouchMove(e) {
-		e.preventDefault();
-		e.stopPropagation();
-		Array.from(e.changedTouches).forEach(touch => {
-			const touchInfo = this.getTouchInfo(touch, e);
-			this.ongoing.get(touchInfo.identifier).update = touchInfo;
-		});
+		if (this.caging) {
+			e.preventDefault();
+			e.stopPropagation();
+			Array.from(e.changedTouches).forEach(touch => {
+				const touchInfo = this.getTouchInfo(touch, e);
+				this.ongoing.get(touchInfo.identifier).update = touchInfo;
+			});
+		}
 	}
 
 	onTouchEnd(e) {
-		if (this.caged) {
+		if (this.caging) {
 			e.preventDefault();
 			e.stopPropagation();
 		}
@@ -104,6 +93,9 @@ export default class TouchGestures {
 				const ongoing = Array.from(this.ongoing.values()).map(i => {
 					return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() });
 				});
+				if (this.caging && !ongoing.length) {
+					this.caging = false;
+				}
 				this.onInteraction(this.squashed, ongoing);
 				this.squashing = null;
 				this.squashed = [];
@@ -152,8 +144,6 @@ export default class TouchGestures {
 		if (dx > 0 && dy >= 0) return degrees;
 		if (dx < 0) return degrees + 90 * 2;
 		if (dx > 0 && dy < 0) return 360 + degrees;
-
-		console.log(dx, dy);
 	}
 
 	getSwipeDirection(degrees) {
@@ -171,27 +161,56 @@ export default class TouchGestures {
 			return;
 		}
 
-		if (
-			touches.length === 1 &&
-			touches[0].type === 'tap' &&
-			ongoing.length === 3 &&
-			ongoing.every(i => i.type === 'hold')
-		) {
-			this.overrideNativeTouch(!this.overriding);
-		} else if (touches.length === 3 && touches.every(i => i.direction === 270)) {
-			this.cage(false);
-		} else if (!this.caged && touches.length === 3 && touches.every(i => i.direction === 90)) {
-			this.cage(true);
+		if (this.two(touches, { type: 'tap' }) && this.one(ongoing, { type: 'hold' })) {
+			this.cage(!this.getCage());
 		}
 	}
 
+	dirToAngle(dir) {
+		return {
+			'right': 0,
+			'up-right': 45,
+			'up': 90,
+			'up-left': 135,
+			'left': 180,
+			'down-left': 225,
+			'down': 270,
+			'down-right': 315
+		}[dir];
+	}
+
+	compare(gesture, specs = {}) {
+		return Object.entries(specs).every(([key, val]) => {
+			key = { dir: 'direction' }[key] || key;
+			const check = (g, v) => g[key] === (key === 'direction' && typeof v === 'string' ? this.dirToAngle(v) : v);
+			return Array.isArray(val) ? val.some(value => check(gesture, value)) : check(gesture, val);
+		});
+	}
+
+	all(gestures, specs, length = gestures.length) {
+		return gestures.length !== length ? false : gestures.every(g => this.compare(g, specs));
+	}
+
+	zero(gestures) {
+		return gestures.length === 0;
+	}
+
+	one(gestures, specs) {
+		return gestures.length !== 1 ? false : this.compare(gestures[0], specs);
+	}
+
+	two(gestures, specs) { return this.all(gestures, specs, 2); }
+	three(gestures, specs) { return this.all(gestures, specs, 3); }
+	four(gestures, specs) { return this.all(gestures, specs, 4); }
+	five(gestures, specs) { return this.all(gestures, specs, 5); }
+
 	destroy() {
-		this.overrideNativeTouch(false);
+		this.cage(false);
 		window.removeEventListener('touchstart', this.onTouchStart);
 		window.removeEventListener('touchend', this.onTouchEnd);
 
 		this.cb = null;
-		this.overriding = this.caged = false;
+		this.caging = false;
 		this.ongoing = this.squashing = this.squashed = null;
 	}
 }

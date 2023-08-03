@@ -40,12 +40,14 @@ export default class TouchGestures {
 			#${el.id} {
 				z-index: 999999999999999999999999999999999999;
 				position: fixed;
-				--bottom: 80px;
-				--size: 80px;
+				--left: 40px;
+				--bottom: 60px;
+				--width: 100px;
+				--height: 100px;
 				bottom: var(--bottom);
-				left: 0;
-				width: var(--size);
-				height: var(--size);
+				left: var(--left);
+				width: var(--width);
+				height: var(--height);
 				background: violet;
 				opacity: 0.3;
 				${css}
@@ -162,7 +164,9 @@ export default class TouchGestures {
 		}
 
 		if (this.two(touches, { type: 'tap' }) && this.one(ongoing, { type: 'hold' })) {
-			this.cage(!this.getCage());
+			const cageExists = this.getCage();
+			this.cage(!cageExists);
+			this.cb({ name: cageExists ? 'uncage' : 'cage', args: [] });
 		}
 	}
 

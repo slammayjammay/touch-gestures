@@ -13,6 +13,7 @@ export default class TouchGestures {
 		this.ongoing = new Map();
 		this.squashing = null;
 		this.squashed = [];
+		this.released = this._released = null;
 
 		this.onTouchStart = this.onTouchStart.bind(this);
 		this.onTouchMove = this.onTouchMove.bind(this);
@@ -20,6 +21,10 @@ export default class TouchGestures {
 
 		window.addEventListener('touchstart', this.onTouchStart);
 		window.addEventListener('touchend', this.onTouchEnd);
+	}
+
+	emit({ name, args = [] } = {}) {
+		this.cb && this.cb({ name, args });
 	}
 
 	cage(append = true, css = '') {
@@ -55,7 +60,7 @@ export default class TouchGestures {
 		`;
 
 		window.addEventListener('touchmove', this.onTouchMove, { passive: false });
-		this.cb && this.cb({ name: append ? 'cage' : 'uncage', args: [] });
+		this.emit({ name: append ? 'cage' : 'uncage' });
 	}
 
 	getCage() {
@@ -71,6 +76,7 @@ export default class TouchGestures {
 		}
 		const touchStart = this.getTouchInfo(e.changedTouches[0], e);
 		this.ongoing.set(touchStart.identifier, { start: touchStart, update: touchStart });
+		this.released = this.released || new Promise(r => this._released = r);
 	}
 
 	onTouchMove(e) {
@@ -101,6 +107,10 @@ export default class TouchGestures {
 				this.onInteraction(this.squashed, ongoing);
 				this.squashing = null;
 				this.squashed = [];
+				if (!ongoing.length) {
+					this.released.then(() => this.released = this._released = null);
+					this._released();
+				}
 			});
 		}
 
@@ -159,14 +169,14 @@ export default class TouchGestures {
 	}
 
 	onInteraction(touches, ongoing) {
-		if (this.cb && this.cb({ name: 'interaction', args: [touches, ongoing] }) === false) {
+		if (this.emit({ name: 'interaction', args: [touches, ongoing] }) === false) {
 			return;
 		}
 
 		if (this.two(touches, { type: 'tap' }) && this.one(ongoing, { type: 'hold' })) {
 			const cageExists = this.getCage();
 			this.cage(!cageExists);
-			this.cb({ name: cageExists ? 'uncage' : 'cage', args: [] });
+			this.emit({ name: cageExists ? 'uncage' : 'cage' });
 		}
 	}
 
@@ -216,5 +226,6 @@ export default class TouchGestures {
 		this.cb = null;
 		this.caging = false;
 		this.ongoing = this.squashing = this.squashed = null;
+		this.released = this._released = null;
 	}
 }

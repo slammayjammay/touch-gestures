@@ -31,9 +31,13 @@ export default class TouchGestures {
 		document.querySelector('#--touch-gestures-cage')?.remove();
 		document.querySelector('#--touch-gestures-cage-style')?.remove();
 
-		if (!append) {
-			return;
+		if (append) {
+			window.addEventListener('touchmove', this.onTouchMove, { passive: false });
+		} else {
+			window.removeEventListener('touchmove', this.onTouchMove);
 		}
+
+		if (!append) return this.emit({ name: 'uncage' });
 
 		const el = document.createElement('div');
 		const style = document.createElement('style');
@@ -43,12 +47,12 @@ export default class TouchGestures {
 		style.id = '--touch-gestures-cage-style';
 		style.innerHTML = `
 			#${el.id} {
-				z-index: 999999999999999999999999999999999999;
-				position: fixed;
 				--left: 40px;
 				--bottom: 60px;
 				--width: 100px;
 				--height: 100px;
+				z-index: 9999;
+				position: fixed;
 				bottom: var(--bottom);
 				left: var(--left);
 				width: var(--width);
@@ -59,8 +63,7 @@ export default class TouchGestures {
 			}
 		`;
 
-		window.addEventListener('touchmove', this.onTouchMove, { passive: false });
-		this.emit({ name: append ? 'cage' : 'uncage' });
+		this.emit({ name: 'cage' });
 	}
 
 	getCage() {
@@ -70,34 +73,26 @@ export default class TouchGestures {
 	onTouchStart(e) {
 		this.caging = this.caging || e.target.id === '--touch-gestures-cage';
 
-		if (this.caging) {
-			e.preventDefault();
-			e.stopPropagation();
-		}
 		const touchStart = this.getTouchInfo(e.changedTouches[0], e);
 		this.ongoing.set(touchStart.identifier, { start: touchStart, update: touchStart });
 		this.released = this.released || new Promise(r => this._released = r);
 	}
 
 	onTouchMove(e) {
-		if (this.caging) {
-			e.preventDefault();
-			e.stopPropagation();
-			Array.from(e.changedTouches).forEach(touch => {
-				const touchInfo = this.getTouchInfo(touch, e);
-				this.ongoing.get(touchInfo.identifier).update = touchInfo;
-			});
-		}
+		e.preventDefault();
+		e.stopPropagation();
+		Array.from(e.changedTouches).forEach(touch => {
+			const touchInfo = this.getTouchInfo(touch, e);
+			this.ongoing.get(touchInfo.identifier).update = touchInfo;
+		});
 	}
 
 	onTouchEnd(e) {
-		if (this.caging) {
-			e.preventDefault();
-			e.stopPropagation();
-		}
 		if (!this.squashing) {
-			this.squashing = new Promise(r => setTimeout(r, 16));
+			this.squashing = new Promise(requestAnimationFrame);
 			this.squashing.then(() => {
+				if (!this.ongoing) return;
+
 				const ongoing = Array.from(this.ongoing.values()).map(i => {
 					return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() });
 				});
@@ -169,15 +164,46 @@ export default class TouchGestures {
 	}
 
 	onInteraction(touches, ongoing) {
-		if (this.emit({ name: 'interaction', args: [touches, ongoing] }) === false) {
-			return;
+		const serial = this.serializeInteraction(touches, ongoing);
+		this.emit({ name: 'interaction', args: { touches, ongoing, serial }  });
+	}
+
+	// TODO: comment
+	serializeInteraction(touches, ongoing) {
+		if (!touches.length) return '';
+		const serial = [this.serializeGestures(touches)];
+		ongoing.length && serial.push(serializeGestures(ongoing));
+		return serial.join('|');
+	}
+
+	serializeGestures(gestures) {
+		if (!gestures.length) return '';
+
+		const cache = {
+			tap: 0,
+			hold: 0,
+			swipes: {}
+		};
+
+		for (const gesture of gestures) {
+			if (gesture.type === 'tap' || gesture.type === 'hold') {
+				cache[gesture.type]++;
+			} else if (gesture.type === 'swipe') {
+				cache.swipes[gesture.direction] ||= { gesture, count: 0 };
+				cache.swipes[gesture.direction].count++;
+			}
 		}
 
-		if (this.two(touches, { type: 'tap' }) && this.one(ongoing, { type: 'hold' })) {
-			const cageExists = this.getCage();
-			this.cage(!cageExists);
-			this.emit({ name: cageExists ? 'uncage' : 'cage' });
-		}
+		const serialized = [];
+		cache.tap && serialized.push(`${cache.tap}:tap`);
+		cache.hold && serialized.push(`${cache.hold}:hold`);
+
+		const swipes = Object.values(cache.swipes)
+			.sort((a, b) => a.gesture.direction - b.gesture.direction)
+			.map(({ gesture, count }) => `${count}:swipe:${this.angleToDir(gesture.direction)}`);
+		swipes.length && serialized.push(swipes.join(','));
+
+		return serialized.join(',');
 	}
 
 	dirToAngle(dir) {
@@ -190,6 +216,19 @@ export default class TouchGestures {
 			'down-left': 225,
 			'down': 270,
 			'down-right': 315
+		}[dir];
+	}
+
+	angleToDir(dir) {
+		return {
+			0: 'right',
+			45: 'up-right',
+			90: 'up',
+			135: 'up-left',
+			180: 'left',
+			225: 'down-left',
+			270: 'down',
+			315: 'down-right'
 		}[dir];
 	}
 

@@ -172,7 +172,7 @@ export default class TouchGestures {
 	serializeInteraction(touches, ongoing) {
 		if (!touches.length) return '';
 		const serial = [this.serializeGestures(touches)];
-		ongoing.length && serial.push(serializeGestures(ongoing));
+		ongoing.length && serial.push(this.serializeGestures(ongoing));
 		return serial.join('|');
 	}
 

@@ -15,13 +15,13 @@ export default class TouchGestures {
 		this.squashed = [];
 		this.released = this._released = null;
 
-		this.onTouchStart = this.onTouchStart.bind(this);
-		this.onTouchMove = this.onTouchMove.bind(this);
-		this.onTouchEnd = this.onTouchEnd.bind(this);
-
-		window.addEventListener('touchstart', this.onTouchStart);
-		window.addEventListener('touchend', this.onTouchEnd);
+		window.addEventListener('touchstart', this._onTouchStart);
+		window.addEventListener('touchend', this._onTouchEnd);
 	}
+
+	_onTouchStart = (...args) => this.onTouchStart(...args);
+	_onTouchMove = (...args) => this.onTouchMove(...args);
+	_onTouchEnd = (...args) => this.onTouchEnd(...args);
 
 	emit({ name, args = [] } = {}) {
 		this.cb && this.cb({ name, args });
@@ -32,9 +32,9 @@ export default class TouchGestures {
 		document.querySelector('#--touch-gestures-cage-style')?.remove();
 
 		if (append) {
-			window.addEventListener('touchmove', this.onTouchMove, { passive: false });
+			window.addEventListener('touchmove', this._onTouchMove, { passive: false });
 		} else {
-			window.removeEventListener('touchmove', this.onTouchMove);
+			window.removeEventListener('touchmove', this._onTouchMove);
 		}
 
 		if (!append) return this.emit({ name: 'uncage' });
@@ -74,8 +74,8 @@ export default class TouchGestures {
 		this.caging = this.caging || e.target.id === '--touch-gestures-cage';
 
 		const touchStart = this.getTouchInfo(e.changedTouches[0], e);
-		this.ongoing.set(touchStart.identifier, { start: touchStart, update: touchStart });
-		this.released = this.released || new Promise(r => this._released = r);
+		this.ongoing.set(touchStart.identifier, { start: touchStart, update: touchStart, emitted: false });
+		this.released ||= new Promise(r => this._released = r);
 	}
 
 	onTouchMove(e) {
@@ -88,33 +88,35 @@ export default class TouchGestures {
 	}
 
 	onTouchEnd(e) {
-		if (!this.squashing) {
-			this.squashing = new Promise(requestAnimationFrame);
-			this.squashing.then(() => {
-				if (!this.ongoing) return;
-
-				const ongoing = Array.from(this.ongoing.values()).map(i => {
-					return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() });
-				});
-				if (this.caging && !ongoing.length) {
-					this.caging = false;
-				}
-				this.onInteraction(this.squashed, ongoing);
-				this.squashing = null;
-				this.squashed = [];
-				if (!ongoing.length) {
-					this.released.then(() => this.released = this._released = null);
-					this._released();
-				}
-			});
-		}
-
 		const touchEnd = this.getTouchInfo(e.changedTouches[0], e);
 		const touchStart = this.ongoing.get(touchEnd.identifier).start;
-		this.ongoing.delete(touchEnd.identifier);
 
-		const interactionInfo = this.getInteractionInfo(touchStart, touchEnd);
-		this.squashed.push(interactionInfo);
+		const alreadyEmitted = this.ongoing.get(touchEnd.identifier).emitted;
+		this.ongoing.delete(touchEnd.identifier);
+		!alreadyEmitted && this.squashed.push(this.getInteractionInfo(touchStart, touchEnd));
+
+		this.squashing ||= new Promise(r => setTimeout(r, 30)).then(() => this.onTouchEndDebounced());
+	}
+
+	onTouchEndDebounced() {
+		if (!this.ongoing) return;
+
+		const ongoing = Array.from(this.ongoing.values()).map(i => {
+			i.emitted = true;
+			return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() });
+		});
+
+		!ongoing.length && this.caging && (this.caging = false);
+
+		(this.squashed.length || ongoing.length) && this.onInteraction(this.squashed, ongoing);
+
+		this.squashing = null;
+		this.squashed = [];
+
+		if (!ongoing.length) {
+			this.released.then(() => this.released = this._released = null);
+			this._released();
+		}
 	}
 
 	getTouchInfo(touch, e) {
@@ -141,7 +143,7 @@ export default class TouchGestures {
 			type = 'hold';
 		}
 
-		return { dt, dx, dy, degrees, direction, type, startEvent: touchStart.e, endEvent: touchEnd.e };
+		return { dt, dx, dy, degrees, direction, type, identifier: touchStart.identifier, startEvent: touchStart.e, endEvent: touchEnd.e };
 	}
 
 	getDegrees(dx, dy) {
@@ -259,8 +261,8 @@ export default class TouchGestures {
 
 	destroy() {
 		this.cage(false);
-		window.removeEventListener('touchstart', this.onTouchStart);
-		window.removeEventListener('touchend', this.onTouchEnd);
+		window.removeEventListener('touchstart', this._onTouchStart);
+		window.removeEventListener('touchend', this._onTouchEnd);
 
 		this.cb = null;
 		this.caging = false;

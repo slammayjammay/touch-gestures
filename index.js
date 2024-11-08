@@ -47,18 +47,19 @@ export default class TouchGestures {
 		style.id = '--touch-gestures-cage-style';
 		style.innerHTML = `
 			#${el.id} {
-				--left: 40px;
-				--bottom: 60px;
-				--width: 100px;
-				--height: 100px;
-				z-index: 9999;
-				position: fixed;
-				bottom: var(--bottom);
-				left: var(--left);
-				width: var(--width);
-				height: var(--height);
-				background: violet;
-				opacity: 0.3;
+				--left: 40px !important;
+				--bottom: 60px !important;
+				--width: 100px !important;
+				--height: 100px !important;
+				z-index: 9999 !important;
+				position: fixed !important;
+				bottom: var(--bottom) !important;
+				left: var(--left) !important;
+				width: var(--width) !important;
+				height: var(--height) !important;
+				background: violet !important;
+				opacity: 0.3 !important;
+				pointer-events: all !important;
 				${css}
 			}
 		`;

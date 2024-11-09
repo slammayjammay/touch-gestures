@@ -1,5 +1,5 @@
 const DEFAULTS = {
-	maxTapDuration: 170,
+	maxTapDuration: 220,
 	maxTapMovement: 2,
 	minSwipeMovement: 50,
 	swipeAngleMargin: 45 / 2,
@@ -51,7 +51,7 @@ export default class TouchGestures {
 				--bottom: 60px !important;
 				--width: 100px !important;
 				--height: 100px !important;
-				z-index: 9999 !important;
+				z-index: 99999999999999999999999999999999999999 !important;
 				position: fixed !important;
 				bottom: var(--bottom) !important;
 				left: var(--left) !important;

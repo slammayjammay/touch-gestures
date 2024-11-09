@@ -9,7 +9,6 @@ export default class TouchGestures {
 	constructor(cb, options = {}) {
 		this.cb = cb;
 		this.options = { ...DEFAULTS, ...options };
-		this.caging = false;
 		this.ongoing = new Map();
 		this.squashing = null;
 		this.squashed = [];
@@ -47,14 +46,14 @@ export default class TouchGestures {
 		style.id = '--touch-gestures-cage-style';
 		style.innerHTML = `
 			#${el.id} {
-				--left: 40px !important;
-				--bottom: 60px !important;
-				--width: 100px !important;
-				--height: 100px !important;
+				--top: 0 !important;
+				--left: 0 !important;
+				--width: 100vw !important;
+				--height: 100vh !important;
 				z-index: 99999999999999999999999999999999999999 !important;
 				position: fixed !important;
-				bottom: var(--bottom) !important;
 				left: var(--left) !important;
+				top: var(--top) !important;
 				width: var(--width) !important;
 				height: var(--height) !important;
 				background: violet !important;
@@ -72,8 +71,6 @@ export default class TouchGestures {
 	}
 
 	onTouchStart(e) {
-		this.caging = this.caging || e.target.id === '--touch-gestures-cage';
-
 		const touchStart = this.getTouchInfo(e.changedTouches[0], e);
 		this.ongoing.set(touchStart.identifier, { start: touchStart, update: touchStart, emitted: false });
 		this.released ||= new Promise(r => this._released = r);
@@ -106,8 +103,6 @@ export default class TouchGestures {
 			i.emitted = true;
 			return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() });
 		});
-
-		!ongoing.length && this.caging && (this.caging = false);
 
 		(this.squashed.length || ongoing.length) && this.onInteraction(this.squashed, ongoing);
 
@@ -266,7 +261,6 @@ export default class TouchGestures {
 		window.removeEventListener('touchend', this._onTouchEnd);
 
 		this.cb = null;
-		this.caging = false;
 		this.ongoing = this.squashing = this.squashed = null;
 		this.released = this._released = null;
 	}

@@ -60,17 +60,17 @@ export default class TouchGestures {
 			opacity: 0.3 !important;
 			pointer-events: all !important;
 			${css}
-		`, style);
+		`, `#${el.id}`);
 
 		this.emit({ name: 'cage' });
 	}
 
-	setCSS(css, style = document.querySelector('#--touch-gestures-cage-style')) {
-		style.innerHTML = this.generateStyleHTML(css, style);
+	setCSS(css, selector) {
+		style.innerHTML = this.generateStyleHTML(css, selector;
 	}
 
-	generateStyleHTML(css, style) {
-		return `#${style.id} { ${css}; }`;
+	generateStyleHTML(css, selector {
+		return `${selector} { ${css}; }`;
 	}
 
 	getCage() {

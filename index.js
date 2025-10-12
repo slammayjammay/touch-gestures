@@ -69,7 +69,7 @@ export default class TouchGestures {
 		style.innerHTML = this.generateStyleHTML(css, selector);
 	}
 
-	generateStyleHTML(css, selector {
+	generateStyleHTML(css, selector) {
 		return `${selector} { ${css}; }`;
 	}
 

@@ -66,7 +66,7 @@ export default class TouchGestures {
 	}
 
 	setCSS(css, selector) {
-		style.innerHTML = this.generateStyleHTML(css, selector;
+		style.innerHTML = this.generateStyleHTML(css, selector);
 	}
 
 	generateStyleHTML(css, selector {

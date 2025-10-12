@@ -46,31 +46,29 @@ export default class TouchGestures {
 		style.id = '--touch-gestures-cage-style';
 
 		this.setCSS(`
-			--top: 0 !important;
-			--left: 0 !important;
-			--width: 100vw !important;
-			--height: 100vh !important;
-			z-index: 99999999999999999999999999999999999999 !important;
-			position: fixed !important;
-			left: var(--left) !important;
-			top: var(--top) !important;
-			width: var(--width) !important;
-			height: var(--height) !important;
-			background: violet !important;
-			opacity: 0.3 !important;
-			pointer-events: all !important;
-			${css}
-		`, `#${el.id}`);
+			#${el.id} {
+				--top: 0 !important;
+				--left: 0 !important;
+				--width: 100vw !important;
+				--height: 100vh !important;
+				z-index: 99999999999999999999999999999999999999 !important;
+				position: fixed !important;
+				left: var(--left) !important;
+				top: var(--top) !important;
+				width: var(--width) !important;
+				height: var(--height) !important;
+				background: violet !important;
+				opacity: 0.3 !important;
+				pointer-events: all !important;
+				${css}
+			}
+		`, style);
 
 		this.emit({ name: 'cage' });
 	}
 
-	setCSS(css, selector) {
-		style.innerHTML = this.generateStyleHTML(css, selector);
-	}
-
-	generateStyleHTML(css, selector) {
-		return `${selector} { ${css}; }`;
+	setCSS(css, style) {
+		style.innerHTML = css;
 	}
 
 	getCage() {

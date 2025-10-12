@@ -44,26 +44,33 @@ export default class TouchGestures {
 		document.body.prepend(el);
 		el.id = '--touch-gestures-cage';
 		style.id = '--touch-gestures-cage-style';
-		style.innerHTML = `
-			#${el.id} {
-				--top: 0 !important;
-				--left: 0 !important;
-				--width: 100vw !important;
-				--height: 100vh !important;
-				z-index: 99999999999999999999999999999999999999 !important;
-				position: fixed !important;
-				left: var(--left) !important;
-				top: var(--top) !important;
-				width: var(--width) !important;
-				height: var(--height) !important;
-				background: violet !important;
-				opacity: 0.3 !important;
-				pointer-events: all !important;
-				${css}
-			}
-		`;
+
+		this.setCSS(`
+			--top: 0 !important;
+			--left: 0 !important;
+			--width: 100vw !important;
+			--height: 100vh !important;
+			z-index: 99999999999999999999999999999999999999 !important;
+			position: fixed !important;
+			left: var(--left) !important;
+			top: var(--top) !important;
+			width: var(--width) !important;
+			height: var(--height) !important;
+			background: violet !important;
+			opacity: 0.3 !important;
+			pointer-events: all !important;
+			${css}
+		`, style);
 
 		this.emit({ name: 'cage' });
+	}
+
+	setCSS(css, style = document.querySelector('#--touch-gestures-cage-style')) {
+		style.innerHTML = this.generateStyleHTML(css, style);
+	}
+
+	generateStyleHTML(css, style) {
+		return `#${style.id} { ${css}; }`;
 	}
 
 	getCage() {

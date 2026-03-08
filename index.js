@@ -85,12 +85,14 @@ export default class TouchGestures {
 		e.preventDefault();
 		e.stopPropagation();
 		Array.from(e.changedTouches).forEach(touch => {
-			const touchInfo = this.getTouchInfo(touch, e);
-			this.ongoing.get(touchInfo.identifier).update = touchInfo;
+			if (!this.ongoing.has(touch.identifier)) return;
+			this.ongoing.get(touch.identifier).update = this.getTouchInfo(touch, e);
 		});
 	}
 
 	onTouchEnd(e) {
+		if (!this.ongoing.has(e.changedTouches[0].identifier)) return;
+
 		const touchEnd = this.getTouchInfo(e.changedTouches[0], e);
 		const touchStart = this.ongoing.get(touchEnd.identifier).start;
 
@@ -168,7 +170,7 @@ export default class TouchGestures {
 
 	onInteraction(touches, ongoing) {
 		const serial = this.serializeInteraction(touches, ongoing);
-		this.emit({ name: 'interaction', args: { touches, ongoing, serial }  });
+		serial && this.emit({ name: 'interaction', args: { touches, ongoing, serial }  });
 	}
 
 	// TODO: comment

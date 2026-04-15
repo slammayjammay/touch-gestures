@@ -55,9 +55,22 @@ export default class TouchGestures {
 				top: var(--top) !important;
 				width: var(--width) !important;
 				height: var(--height) !important;
-				background: violet !important;
-				opacity: 0.3 !important;
 				pointer-events: all !important;
+				--bg-color: rgba(238, 130, 238, 0.3);
+				--divider-color: rgba(255, 255, 255, 0.3);
+				--divider:
+					var(--bg-color) calc(100% / 3 - 1px),
+					var(--divider-color) calc(100% / 3 - 1px),
+					var(--divider-color) calc(100% / 3 + 1px),
+					var(--bg-color) calc(100% / 3 + 1px),
+					var(--bg-color) calc(66.66% - 1px),
+					var(--divider-color) calc(66.66% - 1px),
+					var(--divider-color) calc(66.66% + 1px),
+					var(--bg-color) calc(66.66% + 1px);
+				background:
+					linear-gradient(to right, var(--divider)),
+					linear-gradient(to bottom, var(--divider));
+
 				${css}
 			}
 		`, style);
@@ -194,12 +207,31 @@ export default class TouchGestures {
 		serial && this.emit({ name: 'interaction', args: { touches, ongoing, serial }  });
 	}
 
-	// TODO: comment
+	// examples:
+	// - '1:swipe:up'
+	// - '2:tap|1:hold'
+	// - '3:swipe:up|3:swipe:down'
 	serializeInteraction(touches, ongoing) {
 		if (!touches.length) return '';
 		const serial = [this.serializeGestures(touches)];
 		ongoing.length && serial.push(this.serializeGestures(ongoing));
 		return serial.join('|');
+	}
+
+	// helps parse serials which consist of two parts, touches and ongoing. tests
+	// each substring against respective part. not providing a substring equates
+	// to assertion part doesn't exist.
+	// examples:
+	// - serialCheck('1:tap', ':', null) // true
+	// - serialCheck('1:tap|1:tap', ':', null) // false
+	// - serialCheck('1:tap|1:tap', ':', '') // true
+	// - serialCheck('1:swipe:down-right', '1:swipe') // true
+	serialCheck(serial, asub = null, bsub = null) {
+		if (serial === '') return asub === null && bsub === null;
+		const [a = null, b = null] = serial.split('|');
+		const apass = a === null ? asub === null : asub !== null && a.includes(asub);
+		const bpass = b === null ? bsub === null : bsub !== null && b.includes(bsub);
+		return apass && bpass;
 	}
 
 	serializeGestures(gestures) {
@@ -257,31 +289,6 @@ export default class TouchGestures {
 			315: 'down-right'
 		}[dir];
 	}
-
-	compare(gesture, specs = {}) {
-		return Object.entries(specs).every(([key, val]) => {
-			key = { dir: 'direction' }[key] || key;
-			const check = (g, v) => g[key] === (key === 'direction' && typeof v === 'string' ? this.dirToAngle(v) : v);
-			return Array.isArray(val) ? val.some(value => check(gesture, value)) : check(gesture, val);
-		});
-	}
-
-	all(gestures, specs, length = gestures.length) {
-		return gestures.length !== length ? false : gestures.every(g => this.compare(g, specs));
-	}
-
-	zero(gestures) {
-		return gestures.length === 0;
-	}
-
-	one(gestures, specs) {
-		return gestures.length !== 1 ? false : this.compare(gestures[0], specs);
-	}
-
-	two(gestures, specs) { return this.all(gestures, specs, 2); }
-	three(gestures, specs) { return this.all(gestures, specs, 3); }
-	four(gestures, specs) { return this.all(gestures, specs, 4); }
-	five(gestures, specs) { return this.all(gestures, specs, 5); }
 
 	destroy() {
 		this.cage(false);

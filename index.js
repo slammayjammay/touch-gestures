@@ -143,15 +143,15 @@ export default class TouchGestures {
 	}
 
 	getTouchInfo(touch, e) {
-		const { identifier, pageX, pageY } = touch;
-		const gridCell = this.getGridCell(pageX, pageY);
-		return { e, identifier, pageX, pageY, gridCell, time: performance.now() };
+		const { identifier, clientX, clientY } = touch;
+		const gridCell = this.getGridCell(clientX, clientY);
+		return { e, identifier, clientX, clientY, gridCell, time: performance.now() };
 	}
 
 	getInteractionInfo(touchStart, touchEnd, gridPath) {
 		const dt = touchEnd.time - touchStart.time;
-		const dx = touchEnd.pageX - touchStart.pageX;
-		const dy = touchStart.pageY - touchEnd.pageY;
+		const dx = touchEnd.clientX - touchStart.clientX;
+		const dy = touchStart.clientY - touchEnd.clientY;
 		const degrees = this.getDegrees(dx, dy);
 		const direction = dx === 0 && dy === 0 ? 0 : this.getSwipeDirection(degrees);
 		let type = null;

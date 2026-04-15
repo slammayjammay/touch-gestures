@@ -15,6 +15,7 @@ export default class TouchGestures {
 		this.released = this._released = null;
 
 		window.addEventListener('touchstart', this._onTouchStart);
+		window.addEventListener('touchmove', this._onTouchMove, { passive: true });
 		window.addEventListener('touchend', this._onTouchEnd);
 	}
 
@@ -30,11 +31,8 @@ export default class TouchGestures {
 		document.querySelector('#--touch-gestures-cage')?.remove();
 		document.querySelector('#--touch-gestures-cage-style')?.remove();
 
-		if (append) {
-			window.addEventListener('touchmove', this._onTouchMove, { passive: false });
-		} else {
-			window.removeEventListener('touchmove', this._onTouchMove);
-		}
+		window.removeEventListener('touchmove', this._onTouchMove);
+		window.addEventListener('touchmove', this._onTouchMove, { passive: !append });
 
 		if (!append) return this.emit({ name: 'uncage' });
 
@@ -75,9 +73,25 @@ export default class TouchGestures {
 		return document.querySelector('#--touch-gestures-cage');
 	}
 
+	// 0 1 2
+	// 3 4 5
+	// 6 7 8
+	getGridCell(x, y) {
+		const cellWidth = window.innerWidth / 3;
+		const cellHeight = window.innerHeight / 3;
+		const col = Math.min(2, Math.floor(x / cellWidth));
+		const row = Math.min(2, Math.floor(y / cellHeight));
+		return row * 3 + col;
+	}
+
 	onTouchStart(e) {
 		const touchStart = this.getTouchInfo(e.changedTouches[0], e);
-		this.ongoing.set(touchStart.identifier, { start: touchStart, update: touchStart, emitted: false });
+		this.ongoing.set(touchStart.identifier, {
+			start: touchStart,
+			update: touchStart,
+			emitted: false,
+			gridPath: [touchStart.gridCell]
+		});
 		this.released ||= new Promise(r => this._released = r);
 	}
 
@@ -86,7 +100,12 @@ export default class TouchGestures {
 		e.stopPropagation();
 		Array.from(e.changedTouches).forEach(touch => {
 			if (!this.ongoing.has(touch.identifier)) return;
-			this.ongoing.get(touch.identifier).update = this.getTouchInfo(touch, e);
+			const touchInfo = this.getTouchInfo(touch, e);
+			const ongoing = this.ongoing.get(touch.identifier);
+			ongoing.update = touchInfo;
+
+			const last = ongoing.gridPath[ongoing.gridPath.length - 1];
+			last !== touchInfo.gridCell && ongoing.gridPath.push(touchInfo.gridCell);
 		});
 	}
 
@@ -94,11 +113,12 @@ export default class TouchGestures {
 		if (!this.ongoing.has(e.changedTouches[0].identifier)) return;
 
 		const touchEnd = this.getTouchInfo(e.changedTouches[0], e);
-		const touchStart = this.ongoing.get(touchEnd.identifier).start;
+		const ongoing = this.ongoing.get(touchEnd.identifier);
+		const { start: touchStart, gridPath } = ongoing;
 
-		const alreadyEmitted = this.ongoing.get(touchEnd.identifier).emitted;
+		const alreadyEmitted = ongoing.emitted;
 		this.ongoing.delete(touchEnd.identifier);
-		!alreadyEmitted && this.squashed.push(this.getInteractionInfo(touchStart, touchEnd));
+		!alreadyEmitted && this.squashed.push(this.getInteractionInfo(touchStart, touchEnd, gridPath));
 
 		this.squashing ||= new Promise(r => setTimeout(r, 30)).then(() => this.onTouchEndDebounced());
 	}
@@ -108,7 +128,7 @@ export default class TouchGestures {
 
 		const ongoing = Array.from(this.ongoing.values()).map(i => {
 			i.emitted = true;
-			return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() });
+			return this.getInteractionInfo(i.start, { ...i.update, time: performance.now() }, i.gridPath);
 		});
 
 		(this.squashed.length || ongoing.length) && this.onInteraction(this.squashed, ongoing);
@@ -123,14 +143,15 @@ export default class TouchGestures {
 	}
 
 	getTouchInfo(touch, e) {
-		const { identifier, screenX, screenY } = touch;
-		return { e, identifier, screenX, screenY, time: performance.now() };
+		const { identifier, pageX, pageY } = touch;
+		const gridCell = this.getGridCell(pageX, pageY);
+		return { e, identifier, pageX, pageY, gridCell, time: performance.now() };
 	}
 
-	getInteractionInfo(touchStart, touchEnd) {
+	getInteractionInfo(touchStart, touchEnd, gridPath) {
 		const dt = touchEnd.time - touchStart.time;
-		const dx = touchEnd.screenX - touchStart.screenX;
-		const dy = touchStart.screenY - touchEnd.screenY;
+		const dx = touchEnd.pageX - touchStart.pageX;
+		const dy = touchStart.pageY - touchEnd.pageY;
 		const degrees = this.getDegrees(dx, dy);
 		const direction = dx === 0 && dy === 0 ? 0 : this.getSwipeDirection(degrees);
 		let type = null;
@@ -146,7 +167,7 @@ export default class TouchGestures {
 			type = 'hold';
 		}
 
-		return { dt, dx, dy, degrees, direction, type, identifier: touchStart.identifier, startEvent: touchStart.e, endEvent: touchEnd.e };
+		return { dt, dx, dy, degrees, direction, type, gridPath, identifier: touchStart.identifier, startEvent: touchStart.e, endEvent: touchEnd.e };
 	}
 
 	getDegrees(dx, dy) {
